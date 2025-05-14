@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shopping_item.dart';
 import './settings_page.dart';
+//123123213
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -142,7 +143,7 @@ class _HomePageState extends State<HomePage> {
                   onChanged: (_) => toggleCheck(index),
                   secondary: const Icon(Icons.check_box_outlined),
                 );
-              }).toList(),
+              }),
             ];
           }).toList(),
     );
