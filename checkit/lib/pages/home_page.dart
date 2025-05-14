@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shopping_item.dart';
+import './settings_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -153,9 +154,7 @@ class _HomePageState extends State<HomePage> {
     } else if (_selectedIndex == 1) {
       return const Center(child: Text("Riwayat Belanja (dalam pengembangan)"));
     } else {
-      return const Center(
-        child: Text("Pengaturan Aplikasi (dalam pengembangan)"),
-      );
+      return const SettingsPage();
     }
   }
 
