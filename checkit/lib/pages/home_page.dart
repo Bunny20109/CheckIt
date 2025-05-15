@@ -1,18 +1,21 @@
 import 'dart:convert';
+import 'package:checkit/pages/history_page.dart' show HistoryPage;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shopping_item.dart';
+import '../models/category.dart';
 import './settings_page.dart';
-//123123213
+import '../models/purchase_history_item.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  List<ShoppingItem> items = [];
+  List<Category> categories = [];
   int _selectedIndex = 0;
 
   @override
@@ -23,49 +26,97 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> loadItems() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? data = prefs.getString('shopping_items');
+    String? data = prefs.getString('shopping_categories');
     if (data != null) {
       List jsonData = json.decode(data);
-      items = jsonData.map((e) => ShoppingItem.fromJson(e)).toList();
+      categories = jsonData.map((e) => Category.fromMap(e)).toList();
       setState(() {});
     }
   }
 
   Future<void> saveItems() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String data = json.encode(items.map((e) => e.toJson()).toList());
-    await prefs.setString('shopping_items', data);
+    String data = json.encode(categories.map((e) => e.toMap()).toList());
+    await prefs.setString('shopping_categories', data);
   }
 
-  void addItem(String name, String category, int quantity) {
+  Future<void> saveToHistory() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? historyData = prefs.getString('purchase_history');
+    List<PurchaseHistoryItem> history = [];
+
+    if (historyData != null) {
+      List jsonHistory = json.decode(historyData);
+      history = jsonHistory.map((e) => PurchaseHistoryItem.fromMap(e)).toList();
+    }
+
+    final newHistory = PurchaseHistoryItem(
+      date: DateTime.now(),
+      categories: categories,
+    );
+
+    history.add(newHistory);
+
+    await prefs.setString(
+      'purchase_history',
+      json.encode(history.map((e) => e.toMap()).toList()),
+    );
+  }
+
+  void addItem(String name, String categoryName, int quantity, double price) {
     setState(() {
-      items.add(
-        ShoppingItem(name: name, category: category, quantity: quantity),
+      final existingCategory = categories.firstWhere(
+        (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+        orElse: () {
+          final newCat = Category(name: categoryName, items: []);
+          categories.add(newCat);
+          return newCat;
+        },
+      );
+
+      existingCategory.items.add(
+        ShoppingItem(
+          name: name,
+          category: categoryName,
+          quantity: quantity,
+          price: price,
+        ),
       );
     });
     saveItems();
   }
 
-  void toggleCheck(int index) {
+  void toggleCheck(Category category, int itemIndex) {
     setState(() {
-      items[index].isChecked = !items[index].isChecked;
+      category.items[itemIndex].isChecked =
+          !category.items[itemIndex].isChecked;
     });
     saveItems();
   }
 
-  void reorderItems(int oldIndex, int newIndex) {
+  void removeItem(Category category, int itemIndex) {
     setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final item = items.removeAt(oldIndex);
-      items.insert(newIndex, item);
+      category.items.removeAt(itemIndex);
+      if (category.items.isEmpty) {
+        categories.remove(category);
+      }
     });
     saveItems();
+  }
+
+  double getTotalPrice(Category category) {
+    double total = 0;
+    for (var item in category.items) {
+      total += item.price * item.quantity;
+    }
+    return total;
   }
 
   void showAddDialog() {
     final nameController = TextEditingController();
     final categoryController = TextEditingController();
     final quantityController = TextEditingController(text: '1');
+    final priceController = TextEditingController(text: '0');
 
     showDialog(
       context: context,
@@ -88,6 +139,13 @@ class _HomePageState extends State<HomePage> {
                   decoration: const InputDecoration(labelText: 'Jumlah'),
                   keyboardType: TextInputType.number,
                 ),
+                TextField(
+                  controller: priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Harga per item',
+                  ),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                ),
               ],
             ),
             actions: [
@@ -102,6 +160,7 @@ class _HomePageState extends State<HomePage> {
                     nameController.text,
                     categoryController.text,
                     int.tryParse(quantityController.text) ?? 1,
+                    double.tryParse(priceController.text) ?? 0,
                   );
                   Navigator.pop(context);
                 },
@@ -112,40 +171,59 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget buildShoppingList() {
-    Map<String, List<ShoppingItem>> groupedItems = {};
-    for (var item in items) {
-      groupedItems[item.category] = groupedItems[item.category] ?? [];
-      groupedItems[item.category]!.add(item);
-    }
-
-    return ReorderableListView(
-      onReorder: reorderItems,
-      padding: const EdgeInsets.only(bottom: 80),
-      children:
-          groupedItems.entries.expand((entry) {
-            final category = entry.key;
-            final list = entry.value;
-            return [
-              ListTile(
-                key: ValueKey('header_$category'),
-                title: Text(
-                  category,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                tileColor: Colors.deepPurple.shade100,
-              ),
-              ...list.map((item) {
-                final index = items.indexOf(item);
-                return CheckboxListTile(
-                  key: ValueKey(item.name + item.category),
-                  title: Text('${item.name} (x${item.quantity})'),
-                  value: item.isChecked,
-                  onChanged: (_) => toggleCheck(index),
-                  secondary: const Icon(Icons.check_box_outlined),
+    return ListView.builder(
+      itemCount: categories.length,
+      itemBuilder: (context, categoryIndex) {
+        final category = categories[categoryIndex];
+        return ExpansionTile(
+          title: Text(
+            '${category.name} - Total: Rp ${getTotalPrice(category).toStringAsFixed(0)}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.deepPurple.shade50,
+          children: [
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex -= 1;
+                  final item = category.items.removeAt(oldIndex);
+                  category.items.insert(newIndex, item);
+                });
+                saveItems();
+              },
+              children: List.generate(category.items.length, (itemIndex) {
+                final item = category.items[itemIndex];
+                return ListTile(
+                  key: ValueKey('${category.name}_$itemIndex'),
+                  leading: Checkbox(
+                    value: item.isChecked,
+                    onChanged: (_) => toggleCheck(category, itemIndex),
+                  ),
+                  title: Text(
+                    '${item.name} (x${item.quantity}) - Rp ${item.price.toStringAsFixed(0)}',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => removeItem(category, itemIndex),
+                      ),
+                      ReorderableDragStartListener(
+                        index: itemIndex,
+                        child: const Icon(Icons.drag_handle),
+                      ),
+                    ],
+                  ),
                 );
               }),
-            ];
-          }).toList(),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -153,7 +231,7 @@ class _HomePageState extends State<HomePage> {
     if (_selectedIndex == 0) {
       return buildShoppingList();
     } else if (_selectedIndex == 1) {
-      return const Center(child: Text("Riwayat Belanja (dalam pengembangan)"));
+      return const HistoryPage();
     } else {
       return const SettingsPage();
     }
@@ -170,10 +248,37 @@ class _HomePageState extends State<HomePage> {
       body: buildPageContent(),
       floatingActionButton:
           _selectedIndex == 0
-              ? FloatingActionButton(
-                onPressed: showAddDialog,
-                backgroundColor: Colors.deepPurple,
-                child: const Icon(Icons.add),
+              ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton(
+                    heroTag: 'add',
+                    onPressed: showAddDialog,
+                    backgroundColor: Colors.deepPurple,
+                    child: const Icon(Icons.add),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.extended(
+                    heroTag: 'done',
+                    onPressed: () async {
+                      await saveToHistory();
+                      setState(() {
+                        categories.clear();
+                      });
+                      await saveItems();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Belanjaan berhasil disimpan ke riwayat!',
+                          ),
+                        ),
+                      );
+                    },
+                    backgroundColor: Colors.green,
+                    label: const Text("Selesai Belanja"),
+                    icon: const Icon(Icons.check),
+                  ),
+                ],
               )
               : null,
       bottomNavigationBar: BottomNavigationBar(
