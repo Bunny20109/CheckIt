@@ -50,9 +50,27 @@ class _HomePageState extends State<HomePage> {
       history = jsonHistory.map((e) => PurchaseHistoryItem.fromMap(e)).toList();
     }
 
+    // Buat salinan kategori, tapi hanya dengan item yang dicentang
+    List<Category> checkedCategories = [];
+    for (var category in categories) {
+      List<ShoppingItem> checkedItems =
+          category.items
+              .where((item) => item.isChecked)
+              .map((item) => item.copy())
+              .toList();
+
+      if (checkedItems.isNotEmpty) {
+        checkedCategories.add(
+          Category(name: category.name, items: checkedItems),
+        );
+      }
+    }
+
+    if (checkedCategories.isEmpty) return; // tidak simpan kalau kosong
+
     final newHistory = PurchaseHistoryItem(
       date: DateTime.now(),
-      categories: categories,
+      categories: checkedCategories,
     );
 
     history.add(newHistory);
@@ -107,7 +125,9 @@ class _HomePageState extends State<HomePage> {
   double getTotalPrice(Category category) {
     double total = 0;
     for (var item in category.items) {
-      total += item.price * item.quantity;
+      if (item.isChecked) {
+        total += item.price * item.quantity;
+      }
     }
     return total;
   }
