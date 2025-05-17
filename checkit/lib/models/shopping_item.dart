@@ -1,5 +1,3 @@
-import 'package:checkit/models/category.dart';
-
 class ShoppingItem {
   String name;
   String category;

@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'package:checkit/pages/history_page.dart' show HistoryPage;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shopping_item.dart';
 import '../models/category.dart';
-import './settings_page.dart';
 import '../models/purchase_history_item.dart';
+import './settings_page.dart';
+import './history_page.dart';
+import './category_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -50,7 +51,6 @@ class _HomePageState extends State<HomePage> {
       history = jsonHistory.map((e) => PurchaseHistoryItem.fromMap(e)).toList();
     }
 
-    // Buat salinan kategori, tapi hanya dengan item yang dicentang
     List<Category> checkedCategories = [];
     for (var category in categories) {
       List<ShoppingItem> checkedItems =
@@ -66,7 +66,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    if (checkedCategories.isEmpty) return; // tidak simpan kalau kosong
+    if (checkedCategories.isEmpty) return;
 
     final newHistory = PurchaseHistoryItem(
       date: DateTime.now(),
@@ -104,34 +104,6 @@ class _HomePageState extends State<HomePage> {
     saveItems();
   }
 
-  void toggleCheck(Category category, int itemIndex) {
-    setState(() {
-      category.items[itemIndex].isChecked =
-          !category.items[itemIndex].isChecked;
-    });
-    saveItems();
-  }
-
-  void removeItem(Category category, int itemIndex) {
-    setState(() {
-      category.items.removeAt(itemIndex);
-      if (category.items.isEmpty) {
-        categories.remove(category);
-      }
-    });
-    saveItems();
-  }
-
-  double getTotalPrice(Category category) {
-    double total = 0;
-    for (var item in category.items) {
-      if (item.isChecked) {
-        total += item.price * item.quantity;
-      }
-    }
-    return total;
-  }
-
   void showAddDialog() {
     final nameController = TextEditingController();
     final categoryController = TextEditingController();
@@ -164,7 +136,9 @@ class _HomePageState extends State<HomePage> {
                   decoration: const InputDecoration(
                     labelText: 'Harga per item',
                   ),
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
               ],
             ),
@@ -190,58 +164,70 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  double getTotalPrice(Category category) {
+    double total = 0;
+    for (var item in category.items) {
+      if (item.isChecked) {
+        total += item.price * item.quantity;
+      }
+    }
+    return total;
+  }
+
   Widget buildShoppingList() {
+    if (categories.isEmpty) {
+      return const Center(
+        child: Text('Belum ada kategori. Tambahkan barang terlebih dahulu.'),
+      );
+    }
+
     return ListView.builder(
+      padding: const EdgeInsets.all(8),
       itemCount: categories.length,
-      itemBuilder: (context, categoryIndex) {
-        final category = categories[categoryIndex];
-        return ExpansionTile(
-          title: Text(
-            '${category.name} - Total: Rp ${getTotalPrice(category).toStringAsFixed(0)}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: Colors.deepPurple.shade50,
-          children: [
-            ReorderableListView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex -= 1;
-                  final item = category.items.removeAt(oldIndex);
-                  category.items.insert(newIndex, item);
-                });
-                saveItems();
-              },
-              children: List.generate(category.items.length, (itemIndex) {
-                final item = category.items[itemIndex];
-                return ListTile(
-                  key: ValueKey('${category.name}_$itemIndex'),
-                  leading: Checkbox(
-                    value: item.isChecked,
-                    onChanged: (_) => toggleCheck(category, itemIndex),
-                  ),
-                  title: Text(
-                    '${item.name} (x${item.quantity}) - Rp ${item.price.toStringAsFixed(0)}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => removeItem(category, itemIndex),
-                      ),
-                      ReorderableDragStartListener(
-                        index: itemIndex,
-                        child: const Icon(Icons.drag_handle),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final checked = category.items.where((i) => i.isChecked).length;
+        final total = category.items.length;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                pageBuilder:
+                    (_, __, ___) => CategoryDetailPage(
+                      category: category,
+                      onUpdate: (updatedCategory) {
+                        setState(() {
+                          categories[index] = updatedCategory;
+                        });
+                        saveItems();
+                      },
+                    ),
+                transitionsBuilder: (context, animation, _, child) {
+                  final tween = Tween(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.ease));
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+              ),
+            );
+          },
+          child: Card(
+            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            color: Colors.deepPurple.shade50,
+            child: ListTile(
+              title: Text(
+                category.name,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text('$checked dari $total item selesai'),
+              trailing: const Icon(Icons.chevron_right),
             ),
-          ],
+          ),
         );
       },
     );
