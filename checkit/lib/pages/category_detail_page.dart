@@ -9,10 +9,10 @@ class CategoryDetailPage extends StatefulWidget {
   final Function(Category) onUpdate;
 
   const CategoryDetailPage({
-    Key? key,
+    super.key,
     required this.category,
     required this.onUpdate,
-  }) : super(key: key);
+  });
 
   @override
   State<CategoryDetailPage> createState() => _CategoryDetailPageState();
