@@ -1,7 +1,7 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'pages/home_page.dart';
+import 'pages/login_page.dart'; // pastikan ini sudah ada
 import 'providers/theme_provider.dart';
 
 void main() {
@@ -25,11 +25,13 @@ class MyApp extends StatelessWidget {
           themeProvider.isDarkMode
               ? ThemeData.dark().copyWith(
                 colorScheme: const ColorScheme.dark(primary: Colors.deepPurple),
+                // Jangan set fontFamily di sini
               )
               : ThemeData.light().copyWith(
                 colorScheme: const ColorScheme.light(
                   primary: Colors.deepPurple,
                 ),
+                // Jangan set fontFamily di sini
               ),
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeInOut,
@@ -39,14 +41,17 @@ class MyApp extends StatelessWidget {
         themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
         theme: ThemeData.light().copyWith(
           colorScheme: const ColorScheme.light(primary: Colors.deepPurple),
+          // Jangan set fontFamily di sini
         ),
         darkTheme: ThemeData.dark().copyWith(
           colorScheme: const ColorScheme.dark(primary: Colors.deepPurple),
+          // Jangan set fontFamily di sini
         ),
-        home: const AnimatedSwitcher(
-          duration: Duration(milliseconds: 400),
-          child: HomePage(),
-        ),
+        initialRoute: '/', // Atur initial route
+        routes: {
+          '/': (context) => const LoginPage(),
+          '/home': (context) => const HomePage(),
+        },
       ),
     );
   }
