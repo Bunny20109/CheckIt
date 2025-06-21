@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.checkit"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -30,11 +30,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+    create("release") {
+        storeFile = file("C:/Users/Bunny/Documents/GitHub/CheckIt/checkit/android/app/my-release-key.jks")
+        storePassword = "checkit123"      // misal: checkit123
+        keyAlias = "my-key-alias"
+        keyPassword = "checkit123"        // biasanya sama dengan storePassword
+       }
+    }
+
+
     buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
